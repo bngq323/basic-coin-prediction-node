@@ -98,17 +98,35 @@ def format_data(files, data_provider):
 
             price_df.sort_index().to_csv(training_price_data_path)
 
-
 def load_frame(frame, timeframe):
-    print(f"Loading data...")
-    df = frame.loc[:,['open','high','low','close']].dropna()
-    df[['open','high','low','close']] = df[['open','high','low','close']].apply(pd.to_numeric)
-    print("Raw date values:", frame['date'].head(10))  # 打印前10个日期值
-    df['date'] = frame['date'].apply(pd.to_datetime)
-    df.set_index('date', inplace=True)
-    df.sort_index(inplace=True)
+    frame = frame.copy()
 
-    return df.resample(f'{timeframe}', label='right', closed='right', origin='end').mean()
+    # Ensure 'date' is a string before conversion
+    frame['date'] = frame['date'].astype(str)
+
+    # Function to safely parse dates and filter invalid years
+    def safe_parse_date(x):
+        try:
+            dt = pd.to_datetime(x, errors='coerce')  # Convert, setting invalid values to NaT
+            if dt.year < 2000 or dt.year > 2100:  # Keep only reasonable years
+                return pd.NaT  # Mark invalid dates as NaT
+            return dt
+        except Exception:
+            return pd.NaT  # Mark non-parsable values as NaT
+
+    # Apply date parsing safely
+    frame['date'] = frame['date'].apply(safe_parse_date)
+
+    # Print out problematic date values if any
+    bad_dates = frame[frame['date'].isna()]
+    if not bad_dates.empty:
+        print("⚠️  Warning: Found invalid date values in dataset. These will be removed:")
+        print(bad_dates)
+
+    # Remove invalid date rows
+    frame = frame.dropna(subset=['date'])
+
+    return frame
 
 def train_model(timeframe):
     # Load the price data
