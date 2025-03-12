@@ -37,93 +37,104 @@ def download_data(token, training_days, region, data_provider):
         raise ValueError("Unsupported data provider")
 
 def format_data(files_btc, files_eth, data_provider):
+    print(f"Files for BTCUSDT: {len(files_btc)}, Files for ETHUSDT: {len(files_eth)}")
     if not files_btc or not files_eth:
-        print("Already up to date or no files provided")
+        print("No files provided for BTCUSDT or ETHUSDT, exiting format_data")
         return
     
     if data_provider == "binance":
         files_btc = sorted([x for x in files_btc if x.startswith("BTCUSDT")])
         files_eth = sorted([x for x in files_eth if x.startswith("ETHUSDT")])
+        print(f"Filtered BTCUSDT files: {files_btc[:5]}")
+        print(f"Filtered ETHUSDT files: {files_eth[:5]}")
     elif data_provider == "coingecko":
         files_btc = sorted([x for x in files_btc if x.endswith(".json")])
         files_eth = sorted([x for x in files_eth if x.endswith(".json")])
 
     if len(files_btc) == 0 or len(files_eth) == 0:
-        print("No files to process for BTCUSDT or ETHUSDT")
+        print("No valid files to process for BTCUSDT or ETHUSDT after filtering")
         return
 
     price_df_btc = pd.DataFrame()
     price_df_eth = pd.DataFrame()
 
-    # Process BTCUSDT files
     if data_provider == "binance":
         for file in files_btc:
             zip_file_path = os.path.join(binance_data_path, file)
             if not zip_file_path.endswith(".zip"):
+                print(f"Skipping non-ZIP file: {file}")
                 continue
-            myzip = ZipFile(zip_file_path)
-            with myzip.open(myzip.filelist[0]) as f:
-                line = f.readline()
-                header = 0 if line.decode("utf-8").startswith("open_time") else None
-            df = pd.read_csv(myzip.open(myzip.filelist[0]), header=header).iloc[:, :11]
-            df.columns = ["start_time", "open", "high", "low", "close", "volume", "end_time", "volume_usd", "n_trades", "taker_volume", "taker_volume_usd"]
-            max_time = df["end_time"].max()
-            print(f"Sample end_time values from {file}: {df['end_time'].head().tolist()}")
-            if max_time > 1e15:  # Nanoseconds
-                df["date"] = pd.to_datetime(df["end_time"], unit="ns")
-            elif max_time > 1e12:  # Microseconds
-                df["date"] = pd.to_datetime(df["end_time"], unit="us")
-            else:  # Milliseconds
-                df["date"] = pd.to_datetime(df["end_time"], unit="ms")
-            df.set_index("date", inplace=True)
-            print(f"Processed {file} with {len(df)} rows")
-            price_df_btc = pd.concat([price_df_btc, df])
+            try:
+                myzip = ZipFile(zip_file_path)
+                with myzip.open(myzip.filelist[0]) as f:
+                    line = f.readline()
+                    header = 0 if line.decode("utf-8").startswith("open_time") else None
+                df = pd.read_csv(myzip.open(myzip.filelist[0]), header=header).iloc[:, :11]
+                df.columns = ["start_time", "open", "high", "low", "close", "volume", "end_time", "volume_usd", "n_trades", "taker_volume", "taker_volume_usd"]
+                max_time = df["end_time"].max()
+                print(f"Sample end_time values from {file}: {df['end_time'].head().tolist()}")
+                if max_time > 1e15:  # Nanoseconds
+                    df["date"] = pd.to_datetime(df["end_time"], unit="ns")
+                elif max_time > 1e12:  # Microseconds
+                    df["date"] = pd.to_datetime(df["end_time"], unit="us")
+                else:  # Milliseconds
+                    df["date"] = pd.to_datetime(df["end_time"], unit="ms")
+                df.set_index("date", inplace=True)
+                print(f"Processed {file} with {len(df)} rows")
+                price_df_btc = pd.concat([price_df_btc, df])
+            except Exception as e:
+                print(f"Error processing {file}: {str(e)}")
+                continue
 
-        # Process ETHUSDT files
         for file in files_eth:
             zip_file_path = os.path.join(binance_data_path, file)
             if not zip_file_path.endswith(".zip"):
+                print(f"Skipping non-ZIP file: {file}")
                 continue
-            myzip = ZipFile(zip_file_path)
-            with myzip.open(myzip.filelist[0]) as f:
-                line = f.readline()
-                header = 0 if line.decode("utf-8").startswith("open_time") else None
-            df = pd.read_csv(myzip.open(myzip.filelist[0]), header=header).iloc[:, :11]
-            df.columns = ["start_time", "open", "high", "low", "close", "volume", "end_time", "volume_usd", "n_trades", "taker_volume", "taker_volume_usd"]
-            max_time = df["end_time"].max()
-            print(f"Sample end_time values from {file}: {df['end_time'].head().tolist()}")
-            if max_time > 1e15:  # Nanoseconds
-                df["date"] = pd.to_datetime(df["end_time"], unit="ns")
-            elif max_time > 1e12:  # Microseconds
-                df["date"] = pd.to_datetime(df["end_time"], unit="us")
-            else:  # Milliseconds
-                df["date"] = pd.to_datetime(df["end_time"], unit="ms")
-            df.set_index("date", inplace=True)
-            print(f"Processed {file} with {len(df)} rows")
-            price_df_eth = pd.concat([price_df_eth, df])
+            try:
+                myzip = ZipFile(zip_file_path)
+                with myzip.open(myzip.filelist[0]) as f:
+                    line = f.readline()
+                    header = 0 if line.decode("utf-8").startswith("open_time") else None
+                df = pd.read_csv(myzip.open(myzip.filelist[0]), header=header).iloc[:, :11]
+                df.columns = ["start_time", "open", "high", "low", "close", "volume", "end_time", "volume_usd", "n_trades", "taker_volume", "taker_volume_usd"]
+                max_time = df["end_time"].max()
+                print(f"Sample end_time values from {file}: {df['end_time'].head().tolist()}")
+                if max_time > 1e15:  # Nanoseconds
+                    df["date"] = pd.to_datetime(df["end_time"], unit="ns")
+                elif max_time > 1e12:  # Microseconds
+                    df["date"] = pd.to_datetime(df["end_time"], unit="us")
+                else:  # Milliseconds
+                    df["date"] = pd.to_datetime(df["end_time"], unit="ms")
+                df.set_index("date", inplace=True)
+                print(f"Processed {file} with {len(df)} rows")
+                price_df_eth = pd.concat([price_df_eth, df])
+            except Exception as e:
+                print(f"Error processing {file}: {str(e)}")
+                continue
 
-    # Combine BTCUSDT and ETHUSDT data
+    if price_df_btc.empty or price_df_eth.empty:
+        print("No data processed for BTCUSDT or ETHUSDT")
+        return
+
     price_df_btc = price_df_btc.rename(columns=lambda x: f"{x}_BTCUSDT")
     price_df_eth = price_df_eth.rename(columns=lambda x: f"{x}_ETHUSDT")
     price_df = pd.concat([price_df_btc, price_df_eth], axis=1)
 
-    # Generate lagged features
     for pair in ["ETHUSDT", "BTCUSDT"]:
         for metric in ["open", "high", "low", "close"]:
             for lag in range(1, 11):
                 price_df[f"{metric}_{pair}_lag{lag}"] = price_df[f"{metric}_{pair}"].shift(lag)
 
-    # Add hour_of_day and target_BTCUSDT
     price_df["hour_of_day"] = price_df.index.hour
     price_df["target_BTCUSDT"] = price_df["close_BTCUSDT"].shift(-1)
 
-    # Drop rows with NaN values due to shifting
     price_df = price_df.dropna()
     print(f"Total rows in price_df after preprocessing: {len(price_df)}")
     print(f"First few dates in price_df: {price_df.index[:5].tolist()}")
 
-    # Save to CSV
     price_df.to_csv(training_price_data_path, date_format='%Y-%m-%d %H:%M:%S')
+    print(f"Data saved to {training_price_data_path}")
 
 def load_frame(file_path, timeframe):
     print(f"Loading data from {file_path}...")
@@ -235,9 +246,9 @@ def get_inference(token, timeframe, region, data_provider):
     with open(model_file_path, "rb") as f:
         loaded_model = pickle.load(f)
     if data_provider == "coingecko":
-        X_new = load_frame(download_coingecko_current_day_data(token, CG_API_KEY), timeframe)[0]  # X_train only
+        X_new = load_frame(download_coingecko_current_day_data(token, CG_API_KEY), timeframe)[0]
     else:
-        X_new = load_frame(download_binance_current_day_data(f"{token}USDT", region), timeframe)[0]  # X_train only
+        X_new = load_frame(download_binance_current_day_data(f"{token}USDT", region), timeframe)[0]
     print("Inference input data shape:", X_new.shape)
     current_price_pred = loaded_model.predict(X_new)
     print(f"Prediction: {current_price_pred[0]}")
