@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import BayesianRidge, LinearRegression
 from sklearn.svm import SVR
-from sklearn.neighbors import KNeighborsRegressor  # Add KNN
+from sklearn.neighbors import KNeighborsRegressor  # Added KNN
 from updater import download_binance_daily_data, download_binance_current_day_data, download_coingecko_data, download_coingecko_current_day_data
 from config import data_base_path, model_file_path, TOKEN, MODEL, CG_API_KEY
 
@@ -57,13 +57,17 @@ def format_data(files, data_provider):
                 header = 0 if line.decode("utf-8").startswith("open_time") else None
             df = pd.read_csv(myzip.open(myzip.filelist[0]), header=header).iloc[:, :11]
             df.columns = ["start_time", "open", "high", "low", "close", "volume", "end_time", "volume_usd", "n_trades", "taker_volume", "taker_volume_usd"]
-            if df["end_time"].max() > 1e12:  # Adjust for microseconds if needed
-                df.index = pd.to_datetime(df["end_time"], unit="us")
-            else:
-                df.index = pd.to_datetime(df["end_time"] + 1, unit="ms")
-            df.index.name = "date"
+            # Robust timestamp handling
+            max_time = df["end_time"].max()
+            if max_time > 1e15:  # Nanoseconds
+                df["date"] = pd.to_datetime(df["end_time"], unit="ns")
+            elif max_time > 1e12:  # Microseconds
+                df["date"] = pd.to_datetime(df["end_time"], unit="us")
+            else:  # Milliseconds
+                df["date"] = pd.to_datetime(df["end_time"], unit="ms")
+            df.set_index("date", inplace=True)
             price_df = pd.concat([price_df, df])
-            price_df.sort_index().to_csv(training_price_data_path)
+        price_df.sort_index().to_csv(training_price_data_path)
     elif data_provider == "coingecko":
         for file in files:
             with open(os.path.join(coingecko_data_path, file), "r") as f:
@@ -74,7 +78,7 @@ def format_data(files, data_provider):
                 df.drop(columns=["timestamp"], inplace=True)
                 df.set_index("date", inplace=True)
                 price_df = pd.concat([price_df, df])
-            price_df.sort_index().to_csv(training_price_data_path)
+        price_df.sort_index().to_csv(training_price_data_path)
 
 def load_frame(frame, timeframe):
     print(f"Loading data...")
@@ -88,6 +92,7 @@ def load_frame(frame, timeframe):
 def train_model(timeframe):
     price_data = pd.read_csv(training_price_data_path)
     df = load_frame(price_data, timeframe)
+    print("Training data tail:")
     print(df.tail())
     y_train = df['close'].shift(-1).dropna().values
     X_train = df[['open', 'high', 'low', 'close']].iloc[:-1].values
@@ -100,8 +105,8 @@ def train_model(timeframe):
         model = KernelRidge()
     elif MODEL == "BayesianRidge":
         model = BayesianRidge()
-    elif MODEL == "KNN":  # Add KNN model
-        model = KNeighborsRegressor(n_neighbors=5)  # Default k=5, adjustable
+    elif MODEL == "KNN":
+        model = KNeighborsRegressor(n_neighbors=5)  # KNN with default k=5
     else:
         raise ValueError("Unsupported model")
     model.fit(X_train, y_train)
