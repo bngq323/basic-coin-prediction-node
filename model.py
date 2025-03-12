@@ -170,6 +170,11 @@ def load_frame(file_path, timeframe):
 
 def preprocess_live_data(df_btc, df_eth):
     """Preprocess live BTCUSDT and ETHUSDT DataFrames into 81 features."""
+    if "date" in df_btc.columns:
+        df_btc.set_index("date", inplace=True)
+    if "date" in df_eth.columns:
+        df_eth.set_index("date", inplace=True)
+    
     df_btc = df_btc.rename(columns=lambda x: f"{x}_BTCUSDT" if x != "date" else x)
     df_eth = df_eth.rename(columns=lambda x: f"{x}_ETHUSDT" if x != "date" else x)
     
