@@ -92,12 +92,15 @@ def train_model(timeframe):
     if not os.path.exists(training_price_data_path):
         raise FileNotFoundError(f"Training data file not found at {training_price_data_path}. Ensure data is downloaded and formatted.")
     price_data = pd.read_csv(training_price_data_path)
+    print(f"Raw price data rows: {len(price_data)}")
     df = load_frame(price_data, timeframe)
     print("Training data tail:")
     print(df.tail())
     y_train = df['close'].shift(-1).dropna().values
     X_train = df[['open', 'high', 'low', 'close']].iloc[:-1].values
     print(f"Training data shape: {X_train.shape}, {y_train.shape}")
+    if len(X_train) < 5:
+        raise ValueError(f"Insufficient training data: only {len(X_train)} samples, need at least 5 for KNN.")
     if MODEL == "LinearRegression":
         model = LinearRegression()
     elif MODEL == "SVR":
