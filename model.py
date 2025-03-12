@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import BayesianRidge, LinearRegression
 from sklearn.svm import SVR
-from sklearn.neighbors import KNeighborsRegressor  # Added KNN
+from sklearn.neighbors import KNeighborsRegressor
 from updater import download_binance_daily_data, download_binance_current_day_data, download_coingecko_data, download_coingecko_current_day_data
 from config import data_base_path, model_file_path, TOKEN, MODEL, CG_API_KEY
 
@@ -57,7 +57,6 @@ def format_data(files, data_provider):
                 header = 0 if line.decode("utf-8").startswith("open_time") else None
             df = pd.read_csv(myzip.open(myzip.filelist[0]), header=header).iloc[:, :11]
             df.columns = ["start_time", "open", "high", "low", "close", "volume", "end_time", "volume_usd", "n_trades", "taker_volume", "taker_volume_usd"]
-            # Robust timestamp handling
             max_time = df["end_time"].max()
             if max_time > 1e15:  # Nanoseconds
                 df["date"] = pd.to_datetime(df["end_time"], unit="ns")
@@ -90,6 +89,8 @@ def load_frame(frame, timeframe):
     return df.resample(f'{timeframe}', label='right', closed='right', origin='end').mean()
 
 def train_model(timeframe):
+    if not os.path.exists(training_price_data_path):
+        raise FileNotFoundError(f"Training data file not found at {training_price_data_path}. Ensure data is downloaded and formatted.")
     price_data = pd.read_csv(training_price_data_path)
     df = load_frame(price_data, timeframe)
     print("Training data tail:")
@@ -106,7 +107,7 @@ def train_model(timeframe):
     elif MODEL == "BayesianRidge":
         model = BayesianRidge()
     elif MODEL == "KNN":
-        model = KNeighborsRegressor(n_neighbors=5)  # KNN with default k=5
+        model = KNeighborsRegressor(n_neighbors=5)
     else:
         raise ValueError("Unsupported model")
     model.fit(X_train, y_train)
