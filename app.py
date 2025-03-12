@@ -6,7 +6,6 @@ from config import model_file_path, TOKEN, TIMEFRAME, TRAINING_DAYS, REGION, DAT
 app = Flask(__name__)
 
 def update_data():
-    """Download price data for BTCUSDT and ETHUSDT, format data, and train model."""
     print("Starting data update process...")
     files_btc = download_data("BTC", TRAINING_DAYS, REGION, DATA_PROVIDER)
     files_eth = download_data("ETH", TRAINING_DAYS, REGION, DATA_PROVIDER)
@@ -15,7 +14,6 @@ def update_data():
 
 @app.route("/inference/<string:token>")
 def generate_inference(token):
-    """Generate inference for given token."""
     if not token or token.upper() != TOKEN:
         error_msg = "Token is required" if not token else "Token not supported"
         return Response(json.dumps({"error": error_msg}), status=400, mimetype='application/json')
@@ -27,7 +25,6 @@ def generate_inference(token):
 
 @app.route("/update")
 def update():
-    """Update data and return status."""
     try:
         update_data()
         return "0"
