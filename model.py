@@ -103,6 +103,7 @@ def load_frame(frame, timeframe):
     print(f"Loading data...")
     df = frame.loc[:,['open','high','low','close']].dropna()
     df[['open','high','low','close']] = df[['open','high','low','close']].apply(pd.to_numeric)
+    print("Raw date values:", frame['date'].head(10))  # 打印前10个日期值
     df['date'] = frame['date'].apply(pd.to_datetime)
     df.set_index('date', inplace=True)
     df.sort_index(inplace=True)
