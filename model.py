@@ -168,6 +168,33 @@ def load_frame(file_path, timeframe):
     print(f"Loaded {len(df)} rows, resampled to {timeframe}")
     return X_train, X_test, y_train, y_test, scaler
 
+def preprocess_live_data(df_btc, df_eth):
+    """Preprocess live BTCUSDT and ETHUSDT DataFrames into 81 features."""
+    df_btc = df_btc.rename(columns=lambda x: f"{x}_BTCUSDT" if x != "date" else x)
+    df_eth = df_eth.rename(columns=lambda x: f"{x}_ETHUSDT" if x != "date" else x)
+    
+    df = pd.concat([df_btc, df_eth], axis=1)
+    
+    features = []
+    for pair in ["ETHUSDT", "BTCUSDT"]:
+        for metric in ["open", "high", "low", "close"]:
+            for lag in range(1, 11):
+                feature = f"{metric}_{pair}_lag{lag}"
+                df[feature] = df[f"{metric}_{pair}"].shift(lag)
+                features.append(feature)
+    
+    df["hour_of_day"] = df.index.hour
+    features.append("hour_of_day")
+    
+    df = df.dropna()
+    
+    X = df[features]
+    
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    return X_scaled
+
 def train_model(timeframe, file_path=training_price_data_path):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Training data file not found at {file_path}. Ensure data is downloaded and formatted.")
@@ -247,10 +274,15 @@ def train_model(timeframe, file_path=training_price_data_path):
 def get_inference(token, timeframe, region, data_provider):
     with open(model_file_path, "rb") as f:
         loaded_model = pickle.load(f)
+    
     if data_provider == "coingecko":
-        X_new = load_frame(download_coingecko_current_day_data(token, CG_API_KEY), timeframe)[0]
+        df_btc = download_coingecko_current_day_data("BTC", CG_API_KEY)
+        df_eth = download_coingecko_current_day_data("ETH", CG_API_KEY)
     else:
-        X_new = load_frame(download_binance_current_day_data(f"{token}USDT", region), timeframe)[0]
+        df_btc = download_binance_current_day_data("BTCUSDT", region)
+        df_eth = download_binance_current_day_data("ETHUSDT", region)
+    
+    X_new = preprocess_live_data(df_btc, df_eth)
     print("Inference input data shape:", X_new.shape)
     current_price_pred = loaded_model.predict(X_new)
     print(f"Prediction: {current_price_pred[0]}")
