@@ -37,14 +37,16 @@ def download_data(token, training_days, region, data_provider):
         raise ValueError("Unsupported data provider")
 
 def format_data(files_btc, files_eth, data_provider):
+    print(f"Raw files for BTCUSDT: {files_btc[:5]}")
+    print(f"Raw files for ETHUSDT: {files_eth[:5]}")
     print(f"Files for BTCUSDT: {len(files_btc)}, Files for ETHUSDT: {len(files_eth)}")
     if not files_btc or not files_eth:
         print("No files provided for BTCUSDT or ETHUSDT, exiting format_data")
         return
     
     if data_provider == "binance":
-        files_btc = sorted([f for f in files_btc if os.path.basename(f).startswith("BTCUSDT-1m-")])
-        files_eth = sorted([f for f in files_eth if os.path.basename(f).startswith("ETHUSDT-1m-")])
+        files_btc = sorted([f for f in files_btc if "BTCUSDT" in os.path.basename(f) and f.endswith(".zip")])
+        files_eth = sorted([f for f in files_eth if "ETHUSDT" in os.path.basename(f) and f.endswith(".zip")])
         print(f"Filtered BTCUSDT files: {files_btc[:5]}")
         print(f"Filtered ETHUSDT files: {files_eth[:5]}")
     elif data_provider == "coingecko":
@@ -60,9 +62,9 @@ def format_data(files_btc, files_eth, data_provider):
 
     if data_provider == "binance":
         for file in files_btc:
-            zip_file_path = os.path.join(binance_data_path, file)
-            if not zip_file_path.endswith(".zipLandscape"):
-                print(f"Skipping non-ZIP file: {file}")
+            zip_file_path = os.path.join(binance_data_path, os.path.basename(file))
+            if not os.path.exists(zip_file_path):
+                print(f"File not found: {zip_file_path}")
                 continue
             try:
                 myzip = ZipFile(zip_file_path)
@@ -87,9 +89,9 @@ def format_data(files_btc, files_eth, data_provider):
                 continue
 
         for file in files_eth:
-            zip_file_path = os.path.join(binance_data_path, file)
-            if not zip_file_path.endswith(".zip"):
-                print(f"Skipping non-ZIP file: {file}")
+            zip_file_path = os.path.join(binance_data_path, os.path.basename(file))
+            if not os.path.exists(zip_file_path):
+                print(f"File not found: {zip_file_path}")
                 continue
             try:
                 myzip = ZipFile(zip_file_path)
