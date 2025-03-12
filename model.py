@@ -135,8 +135,11 @@ def train_model(timeframe):
 
     print(df.tail())
 
+    # Define target (next period's close price)
     y_train = df['close'].shift(-1).dropna().values
-    X_train = df[:-1]
+    
+    # Define features (only numeric OHLC columns, exclude index)
+    X_train = df[['open', 'high', 'low', 'close']].iloc[:-1].values
 
     print(f"Training data shape: {X_train.shape}, {y_train.shape}")
 
@@ -149,14 +152,13 @@ def train_model(timeframe):
         model = KernelRidge()
     elif MODEL == "BayesianRidge":
         model = BayesianRidge()
-    # Add more models here
     else:
         raise ValueError("Unsupported model")
     
     # Train the model
     model.fit(X_train, y_train)
 
-    # create the model's parent directory if it doesn't exist
+    # Create the model's parent directory if it doesn't exist
     os.makedirs(os.path.dirname(model_file_path), exist_ok=True)
 
     # Save the trained model to a file
@@ -164,7 +166,6 @@ def train_model(timeframe):
         pickle.dump(model, f)
 
     print(f"Trained model saved to {model_file_path}")
-
 
 def get_inference(token, timeframe, region, data_provider):
     """Load model and predict current price."""
