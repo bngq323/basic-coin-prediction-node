@@ -43,6 +43,7 @@ def format_data(files, data_provider):
         files = sorted([x for x in os.listdir(coingecko_data_path) if x.endswith(".json")])
 
     if len(files) == 0:
+        print("No files to process")
         return
 
     price_df = pd.DataFrame()
@@ -65,7 +66,9 @@ def format_data(files, data_provider):
             else:  # Milliseconds
                 df["date"] = pd.to_datetime(df["end_time"], unit="ms")
             df.set_index("date", inplace=True)
+            print(f"Processed {file} with {len(df)} rows")
             price_df = pd.concat([price_df, df])
+        print(f"Total rows in price_df: {len(price_df)}")
         price_df.sort_index().to_csv(training_price_data_path)
     elif data_provider == "coingecko":
         for file in files:
@@ -77,6 +80,7 @@ def format_data(files, data_provider):
                 df.drop(columns=["timestamp"], inplace=True)
                 df.set_index("date", inplace=True)
                 price_df = pd.concat([price_df, df])
+        print(f"Total rows in price_df: {len(price_df)}")
         price_df.sort_index().to_csv(training_price_data_path)
 
 def load_frame(frame, timeframe):
@@ -86,7 +90,9 @@ def load_frame(frame, timeframe):
     df['date'] = frame['date'].apply(pd.to_datetime)
     df.set_index('date', inplace=True)
     df.sort_index(inplace=True)
-    return df.resample(f'{timeframe}', label='right', closed='right', origin='end').mean()
+    resampled_df = df.resample(f'{timeframe}', label='right', closed='right', origin='end').mean()
+    print(f"Resampled data rows: {len(resampled_df)}")
+    return resampled_df
 
 def train_model(timeframe):
     if not os.path.exists(training_price_data_path):
@@ -111,7 +117,7 @@ def train_model(timeframe):
         model = BayesianRidge()
     elif MODEL == "KNN":
         n_samples = len(X_train)
-        n_neighbors = min(5, n_samples)  # Adjust neighbors dynamically
+        n_neighbors = min(5, n_samples)
         print(f"Using {n_neighbors} neighbors for KNN (limited by {n_samples} samples)")
         model = KNeighborsRegressor(n_neighbors=n_neighbors)
     else:
@@ -124,7 +130,7 @@ def train_model(timeframe):
 
 def get_inference(token, timeframe, region, data_provider):
     with open(model_file_path, "rb") as f:
-        loaded_model = pickle.load(f)
+        loaded_model = pickle_load(f)
     if data_provider == "coingecko":
         X_new = load_frame(download_coingecko_current_day_data(token, CG_API_KEY), timeframe)
     else:
