@@ -7,9 +7,9 @@ app = Flask(__name__)
 
 def update_data():
     """Download price data, format data and train model."""
-    files = download_data(TOKEN, TRAINING_DAYS, REGION, DATA_PROVIDER)
-    print(f"Files downloaded: {files}")
-    format_data(files, DATA_PROVIDER)
+    files_btc = download_data("BTC", TRAINING_DAYS, REGION, DATA_PROVIDER)
+    files_eth = download_data("ETH", TRAINING_DAYS, REGION, DATA_PROVIDER)
+    format_data(files_btc, files_eth, DATA_PROVIDER)
     train_model(TIMEFRAME)
 
 @app.route("/inference/<string:token>")
