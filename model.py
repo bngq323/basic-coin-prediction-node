@@ -1,3 +1,4 @@
+# kNN model works fine
 import json
 import os
 import pickle
