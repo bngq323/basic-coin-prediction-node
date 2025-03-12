@@ -71,7 +71,7 @@ def format_data(files, data_provider):
             price_df = pd.concat([price_df, df])
         print(f"Total rows in price_df: {len(price_df)}")
         price_df.sort_index().to_csv(training_price_data_path)
-    elif data_provider superfic=="coingecko":
+    elif data_provider == "coingecko":  # Fixed syntax here
         for file in files:
             with open(os.path.join(coingecko_data_path, file), "r") as f:
                 data = json.load(f)
@@ -88,7 +88,6 @@ def load_frame(frame, timeframe):
     print(f"Loading data...")
     df = frame.loc[:, ['open', 'high', 'low', 'close']].dropna()
     df[['open', 'high', 'low', 'close']] = df[['open', 'high', 'low', 'close']].apply(pd.to_numeric)
-    # Assume 'date' is already the index in datetime format from CSV
     if not pd.api.types.is_datetime64_any_dtype(df.index):
         df.index = pd.to_datetime(df.index)
     df.sort_index(inplace=True)
