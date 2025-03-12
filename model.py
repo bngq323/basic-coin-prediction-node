@@ -1,4 +1,4 @@
-# kNN model works fine
+# Optimize kNN model via kNN_btc.py for OG
 import json
 import os
 import pickle
@@ -13,11 +13,12 @@ from sklearn.linear_model import LinearRegression, BayesianRidge
 from sklearn.svm import SVR
 from sklearn.kernel_ridge import KernelRidge
 from updater import download_binance_daily_data, download_binance_current_day_data, download_coingecko_data, download_coingecko_current_day_data
-from config import data_base_path, model_file_path, TOKEN, MODEL, CG_API_KEY
+from config import data_base_path, model_file_path, TOKEN, TIMEFRAME, TRAINING_DAYS, REGION, DATA_PROVIDER, MODEL  # Added MODEL
 
 binance_data_path = os.path.join(data_base_path, "binance")
 coingecko_data_path = os.path.join(data_base_path, "coingecko")
 training_price_data_path = os.path.join(data_base_path, "price_data.csv")
+scaler_file_path = os.path.join(data_base_path, "scaler.pkl")
 
 def download_data_binance(token, training_days, region):
     files = download_binance_daily_data(f"{token}USDT", training_days, region, binance_data_path)
@@ -130,7 +131,7 @@ def format_data(files_btc, files_eth, data_provider):
                 price_df[f"{metric}_{pair}_lag{lag}"] = price_df[f"{metric}_{pair}"].shift(lag)
 
     price_df["hour_of_day"] = price_df.index.hour
-    price_df["target_BTCUSDT"] = price_df["close_BTCUSDT"].shift(-1)
+    price_df["target_BTCUSDT"] = (price_df["close_BTCUSDT"].shift(-1) / price_df["close_BTCUSDT"]) - 1
 
     price_df = price_df.dropna()
     print(f"Total rows in price_df after preprocessing: {len(price_df)}")
@@ -146,9 +147,8 @@ def load_frame(file_path, timeframe):
     df.bfill(inplace=True)
     
     features = [
-        f"{metric}_{pair}_lag{lag}" 
-        for pair in ["ETHUSDT", "BTCUSDT"] 
-        for metric in ["open", "high", "low", "close"] 
+        f"close_{pair}_lag{lag}" 
+        for pair in ["ETHUSDT", "BTCUSDT"]
         for lag in range(1, 11)
     ] + ["hour_of_day"]
     
@@ -164,13 +164,12 @@ def load_frame(file_path, timeframe):
     
     split_idx = int(len(X) * 0.8)
     X_train, X_test = X_scaled[:split_idx], X_scaled[split_idx:]
-    y_train, y_test = y[:split_idx], y[split_idx:]
+    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
     
     print(f"Loaded {len(df)} rows, resampled to {timeframe}")
     return X_train, X_test, y_train, y_test, scaler
 
 def preprocess_live_data(df_btc, df_eth):
-    """Preprocess live BTCUSDT and ETHUSDT DataFrames into 81 features."""
     if "date" in df_btc.columns:
         df_btc.set_index("date", inplace=True)
     if "date" in df_eth.columns:
@@ -180,10 +179,11 @@ def preprocess_live_data(df_btc, df_eth):
     df_eth = df_eth.rename(columns=lambda x: f"{x}_ETHUSDT" if x != "date" else x)
     
     df = pd.concat([df_btc, df_eth], axis=1)
+    print(f"Live data sample:\n{df.tail()}")
     
     features = []
     for pair in ["ETHUSDT", "BTCUSDT"]:
-        for metric in ["open", "high", "low", "close"]:
+        for metric in ["close"]:
             for lag in range(1, 11):
                 feature = f"{metric}_{pair}_lag{lag}"
                 df[feature] = df[f"{metric}_{pair}"].shift(lag)
@@ -193,13 +193,15 @@ def preprocess_live_data(df_btc, df_eth):
     features.append("hour_of_day")
     
     df = df.dropna()
+    print(f"Live data after preprocessing:\n{df.tail()}")
     
     X = df[features]
     
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    with open(scaler_file_path, "rb") as f:
+        scaler = pickle.load(f)
+    X_scaled = scaler.transform(X)
     
-    return X_scaled
+    return X_scaled, df["close_BTCUSDT"].iloc[-1]
 
 def train_model(timeframe, file_path=training_price_data_path):
     if not os.path.exists(file_path):
@@ -212,7 +214,7 @@ def train_model(timeframe, file_path=training_price_data_path):
     if MODEL == "KNN":
         print("\n🚀 Training kNN Model with Grid Search...")
         param_grid = {
-            "n_neighbors": [500, 750, 1000],
+            "n_neighbors": [5, 50, 100, 200, 500],
             "weights": ["uniform", "distance"],
             "metric": ["minkowski", "manhattan"]
         }
@@ -262,18 +264,29 @@ def train_model(timeframe, file_path=training_price_data_path):
     else:
         raise ValueError(f"Unsupported model: {MODEL}")
     
+    train_pred = model.predict(X_train)
+    train_mae = mean_absolute_error(y_train, train_pred)
+    train_rmse = np.sqrt(mean_squared_error(y_train, train_pred))
+    train_r2 = r2_score(y_train, train_pred)
+    print(f"Training MAE: {train_mae:.6f}")
+    print(f"Training RMSE: {train_rmse:.6f}")
+    print(f"Training R²: {train_r2:.6f}")
+
     predictions = model.predict(X_test)
     mae = mean_absolute_error(y_test, predictions)
     rmse = np.sqrt(mean_squared_error(y_test, predictions))
     r2 = r2_score(y_test, predictions)
-    print(f"✅ Mean Absolute Error (MAE): {mae:.6f}")
-    print(f"✅ Root Mean Squared Error (RMSE): {rmse:.6f}")
-    print(f"✅ R² Score: {r2:.6f}")
+    print(f"Test MAE: {mae:.6f}")
+    print(f"Test RMSE: {rmse:.6f}")
+    print(f"Test R²: {r2:.6f}")
     
     os.makedirs(os.path.dirname(model_file_path), exist_ok=True)
     with open(model_file_path, "wb") as f:
         pickle.dump(model, f)
+    with open(scaler_file_path, "wb") as f:
+        pickle.dump(scaler, f)
     print(f"Trained model saved to {model_file_path}")
+    print(f"Scaler saved to {scaler_file_path}")
     
     return model, scaler
 
@@ -288,8 +301,11 @@ def get_inference(token, timeframe, region, data_provider):
         df_btc = download_binance_current_day_data("BTCUSDT", region)
         df_eth = download_binance_current_day_data("ETHUSDT", region)
     
-    X_new = preprocess_live_data(df_btc, df_eth)
+    X_new, last_close = preprocess_live_data(df_btc, df_eth)
     print("Inference input data shape:", X_new.shape)
-    current_price_pred = loaded_model.predict(X_new)
-    print(f"Prediction: {current_price_pred[0]}")
-    return current_price_pred[0]
+    return_pred = loaded_model.predict(X_new)[0]
+    current_price_pred = last_close * (1 + return_pred)
+    print(f"Predicted return: {return_pred:.6f}")
+    print(f"Last close: {last_close:.2f}")
+    print(f"Prediction (price): {current_price_pred:.2f}")
+    return current_price_pred
