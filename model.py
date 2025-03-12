@@ -58,7 +58,14 @@ def format_data(files, data_provider):
                 header = 0 if line.decode("utf-8").startswith("open_time") else None
             df = pd.read_csv(myzip.open(myzip.filelist[0]), header=header).iloc[:, :11]
             df.columns = ["start_time", "open", "high", "low", "close", "volume", "end_time", "volume_usd", "n_trades", "taker_volume", "taker_volume_usd"]
-            df["date"] = pd.to_datetime(df["end_time"], unit="ms")  # Binance uses milliseconds
+            max_time = df["end_time"].max()
+            print(f"Sample end_time values from {file}: {df['end_time'].head().tolist()}")
+            if max_time > 1e15:  # Nanoseconds
+                df["date"] = pd.to_datetime(df["end_time"], unit="ns")
+            elif max_time > 1e12:  # Microseconds
+                df["date"] = pd.to_datetime(df["end_time"], unit="us")
+            else:  # Milliseconds
+                df["date"] = pd.to_datetime(df["end_time"], unit="ms")
             df.set_index("date", inplace=True)
             print(f"Processed {file} with {len(df)} rows")
             price_df = pd.concat([price_df, df])
@@ -124,7 +131,7 @@ def train_model(timeframe):
 
 def get_inference(token, timeframe, region, data_provider):
     with open(model_file_path, "rb") as f:
-        loaded_model = pickle.load(f)  # Fixed typo: pickle_load -> pickle.load
+        loaded_model = pickle.load(f)
     if data_provider == "coingecko":
         X_new = load_frame(download_coingecko_current_day_data(token, CG_API_KEY), timeframe)
     else:
