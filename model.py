@@ -71,7 +71,7 @@ def format_data(files, data_provider):
             price_df = pd.concat([price_df, df])
         print(f"Total rows in price_df: {len(price_df)}")
         price_df.sort_index().to_csv(training_price_data_path)
-    elif data_provider == "coingecko":
+    elif data_provider superfic=="coingecko":
         for file in files:
             with open(os.path.join(coingecko_data_path, file), "r") as f:
                 data = json.load(f)
@@ -86,10 +86,11 @@ def format_data(files, data_provider):
 
 def load_frame(frame, timeframe):
     print(f"Loading data...")
-    df = frame.loc[:,['open','high','low','close']].dropna()
-    df[['open','high','low','close']] = df[['open','high','low','close']].apply(pd.to_numeric)
-    df['date'] = frame['date'].apply(pd.to_datetime)
-    df.set_index('date', inplace=True)
+    df = frame.loc[:, ['open', 'high', 'low', 'close']].dropna()
+    df[['open', 'high', 'low', 'close']] = df[['open', 'high', 'low', 'close']].apply(pd.to_numeric)
+    # Assume 'date' is already the index in datetime format from CSV
+    if not pd.api.types.is_datetime64_any_dtype(df.index):
+        df.index = pd.to_datetime(df.index)
     df.sort_index(inplace=True)
     resampled_df = df.resample(f'{timeframe}', label='right', closed='right', origin='end').mean()
     print(f"Resampled data rows: {len(resampled_df)}")
@@ -98,7 +99,7 @@ def load_frame(frame, timeframe):
 def train_model(timeframe):
     if not os.path.exists(training_price_data_path):
         raise FileNotFoundError(f"Training data file not found at {training_price_data_path}. Ensure data is downloaded and formatted.")
-    price_data = pd.read_csv(training_price_data_path)
+    price_data = pd.read_csv(training_price_data_path, index_col='date')
     print(f"Raw price data rows: {len(price_data)}")
     df = load_frame(price_data, timeframe)
     print("Training data tail:")
