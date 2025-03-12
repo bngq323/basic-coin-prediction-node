@@ -72,7 +72,7 @@ def format_data(files, data_provider):
             price_df = pd.concat([price_df, df])
         print(f"Total rows in price_df: {len(price_df)}")
         print(f"First few dates in price_df: {price_df.index[:5].tolist()}")
-        price_df.sort_index().to_csv(training_price_data_path)
+        price_df.sort_index().to_csv(training_price_data_path, date_format='%Y-%m-%d %H:%M:%S')
     elif data_provider == "coingecko":
         for file in files:
             with open(os.path.join(coingecko_data_path, file), "r") as f:
@@ -84,7 +84,7 @@ def format_data(files, data_provider):
                 df.set_index("date", inplace=True)
                 price_df = pd.concat([price_df, df])
         print(f"Total rows in price_df: {len(price_df)}")
-        price_df.sort_index().to_csv(training_price_data_path)
+        price_df.sort_index().to_csv(training_price_data_path, date_format='%Y-%m-%d %H:%M:%S')
 
 def load_frame(frame, timeframe):
     print(f"Loading data...")
@@ -100,7 +100,7 @@ def load_frame(frame, timeframe):
 def train_model(timeframe):
     if not os.path.exists(training_price_data_path):
         raise FileNotFoundError(f"Training data file not found at {training_price_data_path}. Ensure data is downloaded and formatted.")
-    price_data = pd.read_csv(training_price_data_path, index_col='date')
+    price_data = pd.read_csv(training_price_data_path, index_col='date', parse_dates=True)
     print(f"Raw price data rows: {len(price_data)}")
     df = load_frame(price_data, timeframe)
     print("Training data tail:")
