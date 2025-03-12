@@ -3,10 +3,14 @@ import os
 import pickle
 from zipfile import ZipFile
 import pandas as pd
-from sklearn.kernel_ridge import KernelRidge
-from sklearn.linear_model import BayesianRidge, LinearRegression
-from sklearn.svm import SVR
+import numpy as np
+from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, make_scorer
+from sklearn.linear_model import LinearRegression, BayesianRidge
+from sklearn.svm import SVR
+from sklearn.kernel_ridge import KernelRidge
 from updater import download_binance_daily_data, download_binance_current_day_data, download_coingecko_data, download_coingecko_current_day_data
 from config import data_base_path, model_file_path, TOKEN, MODEL, CG_API_KEY
 
@@ -86,62 +90,120 @@ def format_data(files, data_provider):
         print(f"Total rows in price_df: {len(price_df)}")
         price_df.sort_index().to_csv(training_price_data_path, date_format='%Y-%m-%d %H:%M:%S')
 
-def load_frame(frame, timeframe):
-    print(f"Loading data...")
-    df = frame.loc[:, ['open', 'high', 'low', 'close']].dropna()
-    df[['open', 'high', 'low', 'close']] = df[['open', 'high', 'low', 'close']].apply(pd.to_numeric)
-    if not pd.api.types.is_datetime64_any_dtype(df.index):
-        df.index = pd.to_datetime(df.index)
-    df.sort_index(inplace=True)
-    resampled_df = df.resample(f'{timeframe}', label='right', closed='right', origin='end').mean()
-    print(f"Resampled data rows: {len(resampled_df)}")
-    return resampled_df
+def load_frame(file_path, timeframe):
+    print(f"Loading data from {file_path}...")
+    df = pd.read_csv(file_path, index_col='date', parse_dates=True)
+    df.ffill(inplace=True)
+    df.bfill(inplace=True)
+    
+    features = [
+        f"{metric}_{pair}_lag{lag}" 
+        for pair in ["ETHUSDT", "BTCUSDT"] 
+        for metric in ["open", "high", "low", "close"] 
+        for lag in range(1, 11)
+    ] + ["hour_of_day"]
+    
+    missing_features = [f for f in features if f not in df.columns]
+    if missing_features:
+        raise ValueError(f"Missing features in data: {missing_features}")
+    
+    X = df[features]
+    y = df["target_BTCUSDT"]
+    
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    split_idx = int(len(X) * 0.8)
+    X_train, X_test = X_scaled[:split_idx], X_scaled[split_idx:]
+    y_train, y_test = y[:split_idx], y[split_idx:]
+    
+    print(f"Loaded {len(df)} rows, resampled to {timeframe}")
+    return X_train, X_test, y_train, y_test, scaler
 
-def train_model(timeframe):
-    if not os.path.exists(training_price_data_path):
-        raise FileNotFoundError(f"Training data file not found at {training_price_data_path}. Ensure data is downloaded and formatted.")
-    price_data = pd.read_csv(training_price_data_path, index_col='date', parse_dates=True)
-    print(f"Raw price data rows: {len(price_data)}")
-    df = load_frame(price_data, timeframe)
-    print("Training data tail:")
-    print(df.tail())
-    y_train = df['close'].shift(-1).dropna().values
-    X_train = df[['open', 'high', 'low', 'close']].iloc[:-1].values
-    print(f"Training data shape: {X_train.shape}, {y_train.shape}")
-    if len(X_train) < 5:
-        raise ValueError(f"Insufficient training data: only {len(X_train)} samples, need at least 5 for KNN.")
-    if MODEL == "LinearRegression":
+def train_model(timeframe, file_path=training_price_data_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Training data file not found at {file_path}. Ensure data is downloaded and formatted.")
+    
+    X_train, X_test, y_train, y_test, scaler = load_frame(file_path, timeframe)
+    print(f"Training data shape: {X_train.shape}, Test data shape: {X_test.shape}")
+    
+    tscv = TimeSeriesSplit(n_splits=5)
+    if MODEL == "KNN":
+        print("\n🚀 Training kNN Model with Grid Search...")
+        param_grid = {
+            "n_neighbors": [500, 750, 1000],
+            "weights": ["uniform", "distance"],
+            "metric": ["minkowski", "manhattan"]
+        }
+        model = KNeighborsRegressor()
+        grid_search = GridSearchCV(
+            model,
+            param_grid,
+            cv=tscv,
+            scoring=make_scorer(mean_absolute_error, greater_is_better=False),
+            n_jobs=-1,
+            verbose=2
+        )
+        grid_search.fit(X_train, y_train)
+        model = grid_search.best_estimator_
+        print(f"\n✅ Best k: {model.n_neighbors}, Metric: {model.metric}, Weighting: {model.weights}")
+    elif MODEL == "LinearRegression":
         model = LinearRegression()
+        model.fit(X_train, y_train)
+        print("\n✅ Trained LinearRegression model")
     elif MODEL == "SVR":
+        print("\n🚀 Training SVR Model with Grid Search...")
+        param_grid = {
+            "C": [0.1, 1, 10],
+            "epsilon": [0.01, 0.1, 1],
+            "kernel": ["rbf", "linear"]
+        }
         model = SVR()
+        grid_search = GridSearchCV(
+            model,
+            param_grid,
+            cv=tscv,
+            scoring=make_scorer(mean_absolute_error, greater_is_better=False),
+            n_jobs=-1,
+            verbose=2
+        )
+        grid_search.fit(X_train, y_train)
+        model = grid_search.best_estimator_
+        print(f"\n✅ Best C: {model.C}, Epsilon: {model.epsilon}, Kernel: {model.kernel}")
     elif MODEL == "KernelRidge":
         model = KernelRidge()
+        model.fit(X_train, y_train)
+        print("\n✅ Trained KernelRidge model")
     elif MODEL == "BayesianRidge":
         model = BayesianRidge()
-    elif MODEL == "KNN":
-        n_samples = len(X_train)
-        n_neighbors = min(5, n_samples)
-        print(f"Using {n_neighbors} neighbors for KNN (limited by {n_samples} samples)")
-        model = KNeighborsRegressor(n_neighbors=n_neighbors)
+        model.fit(X_train, y_train)
+        print("\n✅ Trained BayesianRidge model")
     else:
-        raise ValueError("Unsupported model")
-    model.fit(X_train, y_train)
+        raise ValueError(f"Unsupported model: {MODEL}")
+    
+    predictions = model.predict(X_test)
+    mae = mean_absolute_error(y_test, predictions)
+    rmse = np.sqrt(mean_squared_error(y_test, predictions))
+    r2 = r2_score(y_test, predictions)
+    print(f"✅ Mean Absolute Error (MAE): {mae:.6f}")
+    print(f"✅ Root Mean Squared Error (RMSE): {rmse:.6f}")
+    print(f"✅ R² Score: {r2:.6f}")
+    
     os.makedirs(os.path.dirname(model_file_path), exist_ok=True)
     with open(model_file_path, "wb") as f:
         pickle.dump(model, f)
     print(f"Trained model saved to {model_file_path}")
+    
+    return model, scaler
 
 def get_inference(token, timeframe, region, data_provider):
     with open(model_file_path, "rb") as f:
         loaded_model = pickle.load(f)
     if data_provider == "coingecko":
-        X_new = load_frame(download_coingecko_current_day_data(token, CG_API_KEY), timeframe)
+        X_new = load_frame(download_coingecko_current_day_data(token, CG_API_KEY), timeframe)[0]  # X_train only
     else:
-        X_new = load_frame(download_binance_current_day_data(f"{token}USDT", region), timeframe)
-    print("Inference input data:")
-    print(X_new.tail())
-    print(f"Inference data shape: {X_new.shape}")
-    X_new_numeric = X_new[['open', 'high', 'low', 'close']].values
-    current_price_pred = loaded_model.predict(X_new_numeric)
+        X_new = load_frame(download_binance_current_day_data(f"{token}USDT", region), timeframe)[0]  # X_train only
+    print("Inference input data shape:", X_new.shape)
+    current_price_pred = loaded_model.predict(X_new)
     print(f"Prediction: {current_price_pred[0]}")
     return current_price_pred[0]
