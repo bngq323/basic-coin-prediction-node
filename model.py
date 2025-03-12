@@ -176,11 +176,13 @@ def get_inference(token, timeframe, region, data_provider):
     if data_provider == "coingecko":
         X_new = load_frame(download_coingecko_current_day_data(token, CG_API_KEY), timeframe)
     else:
-        X_new = load_frame(download_binance_current_day_data(f"{TOKEN}USDT", region), timeframe)
+        X_new = load_frame(download_binance_current_day_data(f"{token}USDT", region), timeframe)
     
     print(X_new.tail())
     print(X_new.shape)
 
-    current_price_pred = loaded_model.predict(X_new)
-
+    # Convert to numeric array, excluding the index
+    X_new_numeric = X_new[['open', 'high', 'low', 'close']].values
+    
+    current_price_pred = loaded_model.predict(X_new_numeric)
     return current_price_pred[0]
