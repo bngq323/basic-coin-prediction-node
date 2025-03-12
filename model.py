@@ -68,10 +68,12 @@ def format_data(files, data_provider):
                 df["date"] = pd.to_datetime(df["end_time"], unit="ms")
             df.set_index("date", inplace=True)
             print(f"Processed {file} with {len(df)} rows")
+            print(f"Sample dates after conversion: {df.index[:5].tolist()}")
             price_df = pd.concat([price_df, df])
         print(f"Total rows in price_df: {len(price_df)}")
+        print(f"First few dates in price_df: {price_df.index[:5].tolist()}")
         price_df.sort_index().to_csv(training_price_data_path)
-    elif data_provider == "coingecko":  # Fixed syntax here
+    elif data_provider == "coingecko":
         for file in files:
             with open(os.path.join(coingecko_data_path, file), "r") as f:
                 data = json.load(f)
