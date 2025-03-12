@@ -110,7 +110,10 @@ def train_model(timeframe):
     elif MODEL == "BayesianRidge":
         model = BayesianRidge()
     elif MODEL == "KNN":
-        model = KNeighborsRegressor(n_neighbors=5)
+        n_samples = len(X_train)
+        n_neighbors = min(5, n_samples)  # Adjust neighbors dynamically
+        print(f"Using {n_neighbors} neighbors for KNN (limited by {n_samples} samples)")
+        model = KNeighborsRegressor(n_neighbors=n_neighbors)
     else:
         raise ValueError("Unsupported model")
     model.fit(X_train, y_train)
@@ -128,6 +131,7 @@ def get_inference(token, timeframe, region, data_provider):
         X_new = load_frame(download_binance_current_day_data(f"{token}USDT", region), timeframe)
     print("Inference input data:")
     print(X_new.tail())
+    print(f"Inference data shape: {X_new.shape}")
     X_new_numeric = X_new[['open', 'high', 'low', 'close']].values
     current_price_pred = loaded_model.predict(X_new_numeric)
     print(f"Prediction: {current_price_pred[0]}")
