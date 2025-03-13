@@ -1,4 +1,3 @@
-# Optimize kNN model via kNN_btc.py for OG
 import json
 import os
 import pickle
@@ -13,7 +12,7 @@ from sklearn.linear_model import LinearRegression, BayesianRidge
 from sklearn.svm import SVR
 from sklearn.kernel_ridge import KernelRidge
 from updater import download_binance_daily_data, download_binance_current_day_data, download_coingecko_data, download_coingecko_current_day_data
-from config import data_base_path, model_file_path, TOKEN, TIMEFRAME, TRAINING_DAYS, REGION, DATA_PROVIDER, MODEL  # Added MODEL
+from config import data_base_path, model_file_path, TOKEN, TIMEFRAME, TRAINING_DAYS, REGION, DATA_PROVIDER, MODEL
 
 binance_data_path = os.path.join(data_base_path, "binance")
 coingecko_data_path = os.path.join(data_base_path, "coingecko")
@@ -214,7 +213,7 @@ def train_model(timeframe, file_path=training_price_data_path):
     if MODEL == "KNN":
         print("\n🚀 Training kNN Model with Grid Search...")
         param_grid = {
-            "n_neighbors": [5, 50, 100, 200, 500],
+            "n_neighbors": [5, 25, 50, 100, 150],  # Adjusted to fit smallest fold
             "weights": ["uniform", "distance"],
             "metric": ["minkowski", "manhattan"]
         }
