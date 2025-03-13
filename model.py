@@ -128,13 +128,13 @@ def format_data(files_btc, files_eth, data_provider):
     for pair in ["ETHUSDT", "BTCUSDT"]:
         price_df[f"log_return_{pair}"] = np.log(price_df[f"close_{pair}"].shift(-1) / price_df[f"close_{pair}"])
         price_df[f"volatility_6h_{pair}"] = price_df[f"log_return_{pair}"].rolling(window=360).std() * np.sqrt(360)
-        for metric in ["close", "volume"]:
+        for metric in ["close", "volume", "log_return"]:
             for lag in range(1, 11):
                 price_df[f"{metric}_{pair}_lag{lag}"] = price_df[f"{metric}_{pair}"].shift(lag)
         price_df[f"volatility_6h_{pair}_lag1"] = price_df[f"volatility_6h_{pair}"].shift(1)
 
     price_df["hour_of_day"] = price_df.index.hour
-    price_df["target_BTCUSDT"] = price_df["volatility_6h_BTCUSDT"]  # Target is 6h volatility
+    price_df["target_BTCUSDT"] = price_df["volatility_6h_BTCUSDT"]
 
     price_df = price_df.dropna()
     print(f"Total rows in price_df after preprocessing: {len(price_df)}")
@@ -152,7 +152,7 @@ def load_frame(file_path, timeframe):
     features = [
         f"{metric}_{pair}_lag{lag}" 
         for pair in ["ETHUSDT", "BTCUSDT"]
-        for metric in ["close", "volume"]
+        for metric in ["close", "volume", "log_return"]
         for lag in range(1, 11)
     ] + [f"volatility_6h_{pair}_lag1" for pair in ["ETHUSDT", "BTCUSDT"]] + ["hour_of_day"]
     
@@ -183,12 +183,12 @@ def preprocess_live_data(df_btc, df_eth):
     df_eth = df_eth.rename(columns=lambda x: f"{x}_ETHUSDT" if x != "date" else x)
     
     df = pd.concat([df_btc, df_eth], axis=1)
-    print(f"Live data sample:\n{df.tail()}")
+    print(f"Live data sample (raw):\n{df.tail()}")
     
     for pair in ["ETHUSDT", "BTCUSDT"]:
         df[f"log_return_{pair}"] = np.log(df[f"close_{pair}"].shift(-1) / df[f"close_{pair}"])
         df[f"volatility_6h_{pair}"] = df[f"log_return_{pair}"].rolling(window=360).std() * np.sqrt(360)
-        for metric in ["close", "volume"]:
+        for metric in ["close", "volume", "log_return"]:
             for lag in range(1, 11):
                 df[f"{metric}_{pair}_lag{lag}"] = df[f"{metric}_{pair}"].shift(lag)
         df[f"volatility_6h_{pair}_lag1"] = df[f"volatility_6h_{pair}"].shift(1)
@@ -201,7 +201,7 @@ def preprocess_live_data(df_btc, df_eth):
     features = [
         f"{metric}_{pair}_lag{lag}" 
         for pair in ["ETHUSDT", "BTCUSDT"]
-        for metric in ["close", "volume"]
+        for metric in ["close", "volume", "log_return"]
         for lag in range(1, 11)
     ] + [f"volatility_6h_{pair}_lag1" for pair in ["ETHUSDT", "BTCUSDT"]] + ["hour_of_day"]
     
@@ -224,7 +224,7 @@ def train_model(timeframe, file_path=training_price_data_path):
     if MODEL == "KNN":
         print("\n🚀 Training kNN Model with Grid Search...")
         param_grid = {
-            "n_neighbors": [5, 25, 50, 100, 150],
+            "n_neighbors": [25, 50, 100, 200],  # Adjusted range
             "weights": ["uniform", "distance"],
             "metric": ["minkowski", "manhattan"]
         }
