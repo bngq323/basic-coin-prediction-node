@@ -168,7 +168,7 @@ def load_frame(file_path, timeframe):
     
     split_idx = int(len(X) * 0.8)
     X_train, X_test = X_scaled[:split_idx], X_scaled[split_idx:]
-    y_train, y_test = y.iloc[:split_idx], coaching y.iloc[split_idx:]
+    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]  # Fixed syntax error
     
     print(f"Loaded {len(df)} rows, resampled to {timeframe}")
     return X_train, X_test, y_train, y_test, scaler
@@ -224,7 +224,7 @@ def train_model(timeframe, file_path=training_price_data_path):
     if MODEL == "KNN":
         print("\n🚀 Training kNN Model with Grid Search...")
         param_grid = {
-            "n_neighbors": [25, 50, 100, 200],  # Adjusted to reduce overfitting
+            "n_neighbors": [25, 50, 100, 200],  # Adjusted range
             "weights": ["uniform", "distance"],
             "metric": ["minkowski", "manhattan"]
         }
