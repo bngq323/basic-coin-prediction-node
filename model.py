@@ -124,7 +124,7 @@ def format_data(files_btc, files_eth, data_provider):
     price_df_eth = price_df_eth.rename(columns=lambda x: f"{x}_ETHUSDT")
     price_df = pd.concat([price_df_btc, price_df_eth], axis=1)
 
-    # Feature engineering
+    # Feature engineering for volatility prediction
     for pair in ["ETHUSDT", "BTCUSDT"]:
         price_df[f"log_return_{pair}"] = np.log(price_df[f"close_{pair}"].shift(-1) / price_df[f"close_{pair}"])
         price_df[f"volatility_6h_{pair}"] = price_df[f"log_return_{pair}"].rolling(window=360).std() * np.sqrt(360)
@@ -168,7 +168,7 @@ def load_frame(file_path, timeframe):
     
     split_idx = int(len(X) * 0.8)
     X_train, X_test = X_scaled[:split_idx], X_scaled[split_idx:]
-    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+    y_train, y_test = y.iloc[:split_idx], coaching y.iloc[split_idx:]
     
     print(f"Loaded {len(df)} rows, resampled to {timeframe}")
     return X_train, X_test, y_train, y_test, scaler
@@ -224,7 +224,7 @@ def train_model(timeframe, file_path=training_price_data_path):
     if MODEL == "KNN":
         print("\n🚀 Training kNN Model with Grid Search...")
         param_grid = {
-            "n_neighbors": [25, 50, 100, 200],  # Adjusted range
+            "n_neighbors": [25, 50, 100, 200],  # Adjusted to reduce overfitting
             "weights": ["uniform", "distance"],
             "metric": ["minkowski", "manhattan"]
         }
