@@ -1,29 +1,40 @@
 {
     "wallet": {
-        "addressKeyName": "testkey",
-        "addressRestoreMnemonic": "charge detect length school habit artwork acid panther bench toy blanket muscle square praise concert price save essay discover between ice twice viable birth",
-        "alloraHomeDir": "",
-        "gas": "auto",
-        "gasAdjustment": 1.5,
-        "gasPrices": 10,
-        "maxFees": 25000000,
-        "nodeRpc": "https://allora-rpc.testnet.allora.network",
-        "maxRetries": 5,
-        "retryDelay": 3,
-        "accountSequenceRetryDelay": 5,
-        "submitTx": true,
-        "blockDurationEstimated": 5,
-        "windowCorrectionFactor": 0.8
+      "chainId": "allora-testnet-1",
+      "keyringBackend": "test",
+      "keyringPassphrase": "",
+      "addressKeyName": "testkey",
+      "addressRestoreMnemonic": "",
+      "alloraHomeDir": "",
+      "gasPrices": "auto",
+      "gasPriceUpdateInterval": 5,
+      "maxFees": 50000000,
+      "gasAdjustment": 1.2,
+      "simulateGasFromStart": true,
+      "GasPerByte": 1,
+      "BaseGas": 200000,
+      "nodeRpcs": ["https://allora-rpc.testnet.allora.network"],
+      "nodegRpcs": ["allora-grpc.testnet.allora.network:443","testnet-allora.lavenderfive.com:443"],
+      "maxRetries": 5,
+      "retryDelay": 3,
+      "accountSequenceRetryDelay": 5,
+      "launchRoutineDelay": 5,
+      "submitTx": true,
+      "blockDurationEstimated": 6,
+      "windowCorrectionFactor": 0.8,
+      "timeoutRPCSecondsQuery": 60,
+      "timeoutRPCSecondsTx": 300,
+      "timeoutRPCSecondsRegistration": 300,
+      "timeoutHTTPConnection": 10
     },
     "worker": [
-        {
-            "topicId": 50,
-            "inferenceEntrypointName": "api-worker-reputer",
-            "loopSeconds": 5,
-            "parameters": {
-                "InferenceEndpoint": "http://inference:8000/inference/{Token}",
-                "Token": "BTC"
-            }
+      {
+        "topicId": 50,
+        "inferenceEntrypointName": "apiAdapter",
+        "parameters": {
+          "InferenceEndpoint": "http://inference:8000/inference/{Token}",
+          "Token": "BTC"
         }
+      }
     ]
-}
+  }
